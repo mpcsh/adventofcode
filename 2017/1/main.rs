@@ -12,8 +12,9 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     let mut sum = 0;
 
+    let len = nums.len();
     for (i, n) in nums.iter().enumerate() {
-        if *n == nums[(i + 1) % nums.len()] {
+        if *n == nums[(i + (len / 2)) % len] {
             sum += n;
         };
     };
