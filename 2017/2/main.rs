@@ -1,21 +1,37 @@
 use std::fs;
 use std::vec::Vec;
 
-fn min_max_cksum(row : Vec<u32>) -> u32 {
+fn min_max_cksum(row : &Vec<u32>) -> u32 {
     let (mut min, mut max) : (u32, u32) = (std::u32::MAX, 0);
     for i in row {
-        if i < min {
-            min = i;
+        if *i < min {
+            min = *i;
         }
-        if i > max {
-            max = i;
+        if *i > max {
+            max = *i;
         }
     }
     max - min
 }
 
-fn cksum<F>(spreadsheet : Vec<Vec<u32>>, row_cksum : F) -> u32
-        where F: Fn(Vec<u32>) -> u32 {
+fn div_cksum(row : &Vec<u32>) -> u32 {
+    for tortoise in row {
+        for hare in row {
+            if tortoise != hare {
+                if tortoise % hare == 0 {
+                    return tortoise / hare;
+                }
+                else if hare % tortoise == 0 {
+                    return hare / tortoise;
+                }
+            }
+        }
+    }
+    panic!("Couldn't find evenly dividing elements!");
+}
+
+fn cksum<F>(spreadsheet : &Vec<Vec<u32>>, row_cksum : F) -> u32
+        where F: Fn(&Vec<u32>) -> u32 {
     let mut cksum : u32 = 0;
     for row in spreadsheet {
         cksum += row_cksum(row);
@@ -37,7 +53,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
         spreadsheet.push(row);
     }
 
-    println!("Part 1: {}", cksum(spreadsheet, min_max_cksum));
+    println!("Part 1: {}", cksum(&spreadsheet, min_max_cksum));
+    println!("Part 2: {}", cksum(&spreadsheet, div_cksum));
 
     Ok(())
 }
