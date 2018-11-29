@@ -1,7 +1,7 @@
 use std::fs;
 use std::vec::Vec;
 
-fn find_min_max(row : Vec<u32>) -> (u32, u32) {
+fn min_max_cksum(row : Vec<u32>) -> u32 {
     let (mut min, mut max) : (u32, u32) = (std::u32::MAX, 0);
     for i in row {
         if i < min {
@@ -11,14 +11,14 @@ fn find_min_max(row : Vec<u32>) -> (u32, u32) {
             max = i;
         }
     }
-    (min, max)
+    max - min
 }
 
-fn cksum(spreadsheet : Vec<Vec<u32>>) -> u32 {
+fn cksum<F>(spreadsheet : Vec<Vec<u32>>, row_cksum : F) -> u32
+        where F: Fn(Vec<u32>) -> u32 {
     let mut cksum : u32 = 0;
     for row in spreadsheet {
-        let (min, max) = find_min_max(row);
-        cksum += max - min;
+        cksum += row_cksum(row);
     }
     cksum
 }
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         spreadsheet.push(row);
     }
 
-    println!("{}", cksum(spreadsheet));
+    println!("Part 1: {}", cksum(spreadsheet, min_max_cksum));
 
     Ok(())
 }
