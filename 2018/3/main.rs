@@ -64,7 +64,7 @@ impl Claim {
     }
 }
 
-fn part_1(claims: &Vec<Claim>) -> i64 {
+fn part_1(claims: &Vec<Claim>) -> (Canvas, i64) {
     let mut canvas: Canvas = HashMap::new();
 
     for claim in claims {
@@ -78,7 +78,28 @@ fn part_1(claims: &Vec<Claim>) -> i64 {
         };
     };
 
-    num_overlaps
+    (canvas, num_overlaps)
+}
+
+fn part_2(claims: &Vec<Claim>, canvas: &Canvas) -> Option<i64> {
+    'over_claims: for claim in claims {
+        let Point {x, y} = claim.origin;
+        let (width, height) = (claim.width, claim.height);
+        for r in y..y + height {
+            for c in x..x + width {
+                let claims_at = canvas
+                                .get(&Point {x: c, y: r})
+                                .unwrap()
+                                .len();
+                if claims_at > 1 {
+                    continue 'over_claims
+                };
+            };
+        };
+        return Some(claim.id);
+    };
+
+    None
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -92,7 +113,9 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     let claims: Vec<Claim> = lines.into_iter().map(|l| Claim::new(&l)).collect();
-    println!("Part 1: in^2 of fabric overlapped = {}", part_1(&claims));
+    let (canvas, num_overlaps) = part_1(&claims);
+    println!("Part 1: in^2 of fabric overlapped = {}", num_overlaps);
+    println!("Part 2: non-overlapping claim = {}", part_2(&claims, &canvas).unwrap());
 
     Ok(())
 }
