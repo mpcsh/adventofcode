@@ -1,6 +1,8 @@
 use std::fs;
 use std::fmt;
+use std::cmp;
 
+#[derive(PartialEq, Eq)]
 struct Timestamp {
     year: i64,
     month: i64,
@@ -38,6 +40,22 @@ impl fmt::Display for Timestamp {
     }
 }
 
+impl cmp::Ord for Timestamp {
+    fn cmp(&self, other: &Timestamp) -> cmp::Ordering {
+        self.year.cmp(&other.year)
+            .then(self.month.cmp(&other.month))
+            .then(self.day.cmp(&other.day))
+            .then(self.hour.cmp(&other.hour))
+            .then(self.minute.cmp(&other.minute))
+    }
+}
+
+impl cmp::PartialOrd for Timestamp {
+    fn partial_cmp(&self, other: &Timestamp) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(PartialEq, Eq)]
 enum RecordKind {
     BeginsShift, FallsAsleep, WakesUp
@@ -53,6 +71,7 @@ impl fmt::Display for RecordKind {
     }
 }
 
+#[derive(PartialEq, Eq)]
 struct Record {
     timestamp: Timestamp,
     guard_id: Option<i64>,
@@ -103,6 +122,17 @@ impl fmt::Display for Record {
     }
 }
 
+impl cmp::Ord for Record {
+    fn cmp(&self, other: &Record) -> cmp::Ordering {
+        self.timestamp.cmp(&other.timestamp)
+    }
+}
+
+impl cmp::PartialOrd for Record {
+    fn partial_cmp(&self, other: &Record) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 fn main() -> Result<(), std::io::Error> {
     let contents: String = fs::read_to_string("input.txt")?;
@@ -114,7 +144,12 @@ fn main() -> Result<(), std::io::Error> {
         };
     };
 
-    let records: Vec<Record> = lines.iter().map(Record::from_string).collect();
+    let mut records = lines.iter()
+        .map(Record::from_string)
+        .collect::<Vec<Record>>();
+
+    records.sort_unstable();
+
     for record in records {
         println!("{}", record);
     };
