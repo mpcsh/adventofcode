@@ -1,8 +1,10 @@
 use std::fs;
 use std::fmt;
 use std::cmp;
+use std::collections::HashMap;
+use std::ops;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 struct Timestamp {
     year: i64,
     month: i64,
@@ -56,7 +58,14 @@ impl cmp::PartialOrd for Timestamp {
     }
 }
 
-#[derive(PartialEq, Eq)]
+impl ops::Sub for Timestamp {
+    type Output = i64;
+    fn sub(self, other: Timestamp) -> i64 {
+        self.minute - other.minute
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum RecordKind {
     BeginsShift, FallsAsleep, WakesUp
 }
@@ -71,7 +80,7 @@ impl fmt::Display for RecordKind {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 struct Record {
     timestamp: Timestamp,
     guard_id: Option<i64>,
@@ -134,6 +143,84 @@ impl cmp::PartialOrd for Record {
     }
 }
 
+fn part_1(records_by_guard: &HashMap<i64, Vec<Record>>) -> (i64, i64) {
+    let mut laziest_guard_id: Option<i64> = None;
+    let mut laziest_sleep_time: i64 = 0;
+    for (id, rs) in records_by_guard.iter() {
+        let mut minutes_asleep = 0;
+
+        let (sleep, wake): (Vec<Record>, Vec<Record>) = rs
+                            .iter()
+                            .partition(|&r| r.kind == RecordKind::FallsAsleep);
+
+        for (s, w) in sleep.iter().zip(wake.iter()) {
+            minutes_asleep += w.timestamp - s.timestamp;
+        };
+
+        if minutes_asleep > laziest_sleep_time {
+            laziest_sleep_time = minutes_asleep;
+            laziest_guard_id = Some(*id);
+        };
+    };
+
+    let laziest_records = records_by_guard.get(&laziest_guard_id.unwrap()).unwrap();
+    let (sleep, wake): (Vec<Record>, Vec<Record>) = laziest_records
+        .iter()
+        .partition(|&r| r.kind == RecordKind::FallsAsleep);
+
+    let mut asleep_by_minute: HashMap<i64, i64> = HashMap::new();
+    for (s, w) in sleep.iter().zip(wake.iter()) {
+        for minute in (s.timestamp.minute)..(w.timestamp.minute) {
+            *asleep_by_minute.entry(minute)
+                .or_insert(0)
+                += 1;
+        };
+    };
+
+    let mut laziest_minute = None;
+    let mut laziest_count = 0;
+    for (&minute, &count) in asleep_by_minute.iter() {
+        if count > laziest_count {
+            laziest_count = count;
+            laziest_minute = Some(minute);
+        };
+    };
+
+    (laziest_guard_id.unwrap(), laziest_minute.unwrap())
+}
+
+fn part_2(records_by_guard: &HashMap<i64, Vec<Record>>) -> (i64, i64) {
+    let mut asleep_by_guard_and_minute: HashMap<(i64, i64), i64> = HashMap::new();
+
+    for (&id, rs) in records_by_guard.iter() {
+        let (sleep, wake): (Vec<Record>, Vec<Record>) = rs
+            .iter()
+            .partition(|&r| r.kind == RecordKind::FallsAsleep);
+
+        for (s, w) in sleep.iter().zip(wake.iter()) {
+            for minute in (s.timestamp.minute)..(w.timestamp.minute) {
+                *asleep_by_guard_and_minute.entry((id, minute))
+                    .or_insert(0)
+                    += 1;
+            };
+        };
+    };
+
+    let mut consistentest_guard = None;
+    let mut consistentest_minute = None;
+    let mut consistentest_count = 0;
+
+    for (&(id, minute), &count) in asleep_by_guard_and_minute.iter() {
+        if count > consistentest_count {
+            consistentest_guard = Some(id);
+            consistentest_minute = Some(minute);
+            consistentest_count = count;
+        };
+    };
+
+    (consistentest_guard.unwrap(), consistentest_minute.unwrap())
+}
+
 fn main() -> Result<(), std::io::Error> {
     let contents: String = fs::read_to_string("input.txt")?;
 
@@ -150,9 +237,29 @@ fn main() -> Result<(), std::io::Error> {
 
     records.sort_unstable();
 
-    for record in records {
-        println!("{}", record);
+    let mut records_by_guard: HashMap<i64, Vec<Record>> = HashMap::new();
+
+    let mut current_guard_id: Option<i64> = None;
+    for mut record in records {
+        match record.guard_id {
+            Some(id) => current_guard_id = Some(id),
+            None => record.guard_id = current_guard_id
+        };
+        match record.kind {
+            RecordKind::BeginsShift => (),
+            _ => records_by_guard
+                    .entry(current_guard_id.unwrap())
+                    .or_insert(Vec::new())
+                    .push(record)
+        };
     };
 
+    let (laziest_id, laziest_minute) = part_1(&records_by_guard);
+    println!("Part 1: guard {} was the laziest, most often asleep at minute {}. Answer = {}",
+             laziest_id, laziest_minute, laziest_id * laziest_minute);
+
+    let (consistentest_id, consistentest_minute) = part_2(&records_by_guard);
+    println!("Part 2: guard {} was the most consistent, most often asleep at minute {}. Answer = {}",
+             consistentest_id, consistentest_minute, consistentest_id * consistentest_minute);
     Ok(())
 }
