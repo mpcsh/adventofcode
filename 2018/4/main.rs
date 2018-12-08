@@ -1,4 +1,5 @@
 use std::fs;
+use std::fmt;
 
 struct Timestamp {
     year: i64,
@@ -29,9 +30,27 @@ impl Timestamp {
     }
 }
 
+impl fmt::Display for Timestamp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{:#04}-{:#02}-{:#02} {:#02}:{:#02}]",
+               self.year, self.month, self.day,
+               self.hour, self.minute)
+    }
+}
+
 #[derive(PartialEq, Eq)]
 enum RecordKind {
     BeginsShift, FallsAsleep, WakesUp
+}
+
+impl fmt::Display for RecordKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            RecordKind::BeginsShift => "begins shift",
+            RecordKind::FallsAsleep => "falls asleep",
+            RecordKind::WakesUp => "wakes up"
+        })
+    }
 }
 
 struct Record {
@@ -69,7 +88,18 @@ impl Record {
             };
         };
 
-        Record { timestamp, kind, guard_id }
+        Record { timestamp, guard_id, kind }
+    }
+}
+
+impl fmt::Display for Record {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.kind == RecordKind::BeginsShift {
+            write!(f, "{} Guard #{} {}", self.timestamp, self.guard_id.unwrap(), self.kind)
+        }
+        else {
+            write!(f, "{} {}", self.timestamp, self.kind)
+        }
     }
 }
 
@@ -84,9 +114,10 @@ fn main() -> Result<(), std::io::Error> {
         };
     };
 
-    Record::from_string(&lines[0]);
-    Record::from_string(&lines[1]);
-    Record::from_string(&lines[10]);
+    let records: Vec<Record> = lines.iter().map(Record::from_string).collect();
+    for record in records {
+        println!("{}", record);
+    };
 
     Ok(())
 }
