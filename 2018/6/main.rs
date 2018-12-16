@@ -6,9 +6,9 @@ fn manhattan_distance((x1, y1): (i64, i64), (x2, y2): (i64, i64)) -> i64 {
     (x2 - x1).abs() + (y2 - y1).abs()
 }
 
-fn part_1(points: &mut BTreeMap<(i64, i64), i64>, x_max: i64, y_max: i64) -> i64 {
-    for x in 0..x_max {
-        for y in 0..y_max {
+fn part_1(points: &mut BTreeMap<(i64, i64), Option<i64>>, x_max: i64, y_max: i64) -> i64 {
+    for x in 0..(x_max + 1) {
+        for y in 0..(y_max + 1) {
             let mut min_distance = None;
             let mut closest_point = None;
             for (&point, _) in points.iter() {
@@ -21,19 +21,43 @@ fn part_1(points: &mut BTreeMap<(i64, i64), i64>, x_max: i64, y_max: i64) -> i64
                 };
             };
 
+            if ([0, x_max].contains(&x) || [0, y_max].contains(&y))
+                && closest_point != None {
+                let _ = points.insert(closest_point.unwrap(), None);
+            };
+
             if closest_point != None {
-                *(points.get_mut(&closest_point.unwrap()).unwrap()) += 1;
+                let area_size: &mut Option<i64> = points
+                    .get_mut(&closest_point.unwrap())
+                    .unwrap();
+                match area_size {
+                    None => (),
+                    Some(s) => *s += 1
+                };
             };
         };
     };
-    0
+
+    let mut max_area: Option<i64> = None;
+    for area in points.values() {
+        match area {
+            None => (),
+            Some(a) => {
+                if max_area == None || *a > max_area.unwrap() {
+                    max_area = Some(*a)
+                };
+            }
+        };
+    };
+
+    max_area.unwrap()
 }
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
     let contents: String = fs::read_to_string(&args[1])?;
 
-    let mut points: BTreeMap<(i64, i64), i64> = BTreeMap::new();
+    let mut points: BTreeMap<(i64, i64), Option<i64>> = BTreeMap::new();
 
     let mut x_max = 0;
     let mut y_max = 0;
@@ -52,9 +76,11 @@ fn main() -> Result<(), std::io::Error> {
                 y_max = y;
             }
 
-            points.insert((x, y), 0);
+            points.insert((x, y), Some(0));
         };
     };
+
+    println!("Part 1: largest non-infinite area = {}", part_1(&mut points, x_max, y_max));
 
     Ok(())
 }
