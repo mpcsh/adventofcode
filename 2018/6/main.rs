@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::collections::BTreeMap;
 
@@ -29,7 +30,8 @@ fn part_1(points: &mut BTreeMap<(i64, i64), i64>, x_max: i64, y_max: i64) -> i64
 }
 
 fn main() -> Result<(), std::io::Error> {
-    let contents: String = fs::read_to_string("input.txt")?;
+    let args: Vec<String> = env::args().collect();
+    let contents: String = fs::read_to_string(&args[1])?;
 
     let mut points: BTreeMap<(i64, i64), i64> = BTreeMap::new();
 
