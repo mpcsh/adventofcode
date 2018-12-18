@@ -53,6 +53,23 @@ fn part_1(points: &mut BTreeMap<(i64, i64), Option<i64>>, x_max: i64, y_max: i64
     max_area.unwrap()
 }
 
+fn part_2(points: &BTreeMap<(i64, i64), Option<i64>>, x_max: i64, y_max: i64) -> i64 {
+    let mut region_size = 0;
+    for x in 0..(x_max + 1) {
+        for y in 0..(y_max + 1) {
+            let mut sum_dist = 0;
+            for (&point, _) in points.iter() {
+                sum_dist += manhattan_distance(point, (x, y));
+            };
+            if sum_dist < 10000 {
+                region_size += 1;
+            };
+        };
+    };
+
+    region_size
+}
+
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
     let contents: String = fs::read_to_string(&args[1])?;
@@ -81,6 +98,8 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     println!("Part 1: largest non-infinite area = {}", part_1(&mut points, x_max, y_max));
+    println!("Part 2: region containing locations with distance < 10000 = {}",
+             part_2(&points, x_max, y_max));
 
     Ok(())
 }
