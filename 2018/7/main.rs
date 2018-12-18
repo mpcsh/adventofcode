@@ -2,31 +2,54 @@ use std::env;
 use std::fs;
 use std::collections::HashMap;
 use std::collections::BTreeSet;
+use std::collections::BinaryHeap;
 
 type Graph = HashMap<char, BTreeSet<char>>;
 
-fn part_1(graph: &mut Graph, incoming: &mut Graph, origins: &mut BTreeSet<char>) -> Vec<char> {
-    // L <- empty list that will contain the sorted elements
+fn time(c: &char) -> i64 {
+    ((*c as u8) - ('A' as u8) + 61) as i64
+}
+
+fn is_full<T: std::cmp::Ord>(heap: &BinaryHeap<T>) -> bool {
+    heap.len() == heap.capacity()
+}
+
+fn process(graph: &mut Graph,
+           incoming: &mut Graph,
+           origins: &mut BTreeSet<char>,
+           num_workers: i64) -> (Vec<char>, i64) {
     let mut ordering: Vec<char> = Vec::new();
+    let mut workers: BinaryHeap<(i64, char)> = BinaryHeap::with_capacity(
+        num_workers as usize);
+    let mut current_time = 0;
 
-    while !origins.is_empty() {
-        // remove a node n from S
-        let n: char = *origins.iter().next().unwrap();
-        let _ = origins.remove(&n);
+    while !origins.is_empty() || !is_full(&workers) {
+        // schedule as many as we can
+        while !origins.is_empty() && !is_full(&workers) {
+            let n: char = *origins.iter().next().unwrap();
+            let _ = origins.remove(&n);
+            workers.push((0 - (current_time + time(&n)), n.clone()));
+        };
 
-        // add n to tail of L
-        ordering.push(n.clone());
+        // process until origins is not empty and queue is not full
+        while !workers.is_empty() && (origins.is_empty() || is_full(&workers)) {
+            let (completion_time, task) = workers.pop().unwrap();
+            current_time = 0 - completion_time;
+            ordering.push(task.clone());
 
-        // for each node m with an edge e from n to m
-        for &m in graph.get(&n).unwrap().iter() {
-            // remove edge e from the graph
-            let incoming_edges = incoming.get_mut(&m).unwrap();
-            let _ = incoming_edges.remove(&n);
+            for &m in graph.get(&task).unwrap().iter() {
+                let incoming_edges = incoming.get_mut(&m).unwrap();
+                let _ = incoming_edges.remove(&task);
 
-            // if m has no other incoming edges
-            if incoming_edges.is_empty() {
-                origins.insert(m);
+                if incoming_edges.is_empty() {
+                    origins.insert(m);
+                };
             };
+        };
+
+        // if we're done, we're done
+        if workers.is_empty() && origins.is_empty() {
+            break;
         };
     };
 
@@ -35,7 +58,7 @@ fn part_1(graph: &mut Graph, incoming: &mut Graph, origins: &mut BTreeSet<char>)
         panic!("Cycle detected!");
     };
 
-    ordering
+    (ordering, current_time)
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -84,9 +107,19 @@ fn main() -> Result<(), std::io::Error> {
             .or_insert(BTreeSet::new());
     };
 
-    println!("Part 1: ordering = {}",
-             part_1(&mut graph, &mut incoming, &mut origins)
-                 .iter().collect::<String>());
+    let (ordering_1, _) = process(&mut graph.clone(),
+                                  &mut incoming.clone(),
+                                  &mut origins.clone(),
+                                  1);
+    println!("Part 1: ordering = {}", ordering_1.iter().collect::<String>());
+
+    let (ordering_2, time_2) = process(&mut graph.clone(),
+                                  &mut incoming.clone(),
+                                  &mut origins.clone(),
+                                  5);
+    println!("Part 2: ordering = {}, time = {}",
+             ordering_2.iter().collect::<String>(),
+             time_2);
 
     Ok(())
 }
