@@ -67,6 +67,25 @@ fn part_1(tree: &Node) -> u64 {
     count
 }
 
+fn part_2(tree: &Node) -> u64 {
+    if tree.num_children == 0 {
+        tree.metadata
+            .iter()
+            .fold(0, |acc, x| acc + x)
+    }
+    else {
+        tree.metadata
+            .iter()
+            .fold(0, |acc, &i| {
+                if i > tree.num_children {
+                    acc
+                } else {
+                    acc + part_2(&tree.children[i as usize - 1])
+                }
+            })
+    }
+}
+
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
     let contents: String = fs::read_to_string(&args[1])?;
@@ -84,6 +103,7 @@ fn main() -> Result<(), std::io::Error> {
     let tree = Node::from_raw(raw).unwrap();
 
     println!("Part 1: sum of all metadata entries = {}", part_1(&tree));
+    println!("Part 2: value of root node = {}", part_2(&tree));
 
     Ok(())
 }
