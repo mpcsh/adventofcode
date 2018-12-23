@@ -1,0 +1,11 @@
+[package]
+name = "day9"
+version = "0.1.0"
+authors = ["Mark Cohen <m@mpc.sh>"]
+edition = "2018"
+
+[dependencies]
+
+[[bin]]
+name = "day9"
+path = "main.rs"
