@@ -88,18 +88,73 @@ fn main() -> Result<(), std::io::Error> {
     let num_players = args[1].parse::<usize>().unwrap();
     let num_marbles = args[2].parse::<usize>().unwrap();
 
-    let mut game = Circle::new();
-    game.insert(1);
-    game.insert(2);
-    game.insert(3);
-    game.insert(4);
-    game.print();
-    game.rotate(1);
-    game.print();
-    game.rotate(3);
-    game.print();
-    game.rotate(-8);
     println!("Part 1: highest score = {}", part_1(num_players, num_marbles));
 
     Ok(())
+}
+
+#[test]
+fn creation() {
+    let mut circle: Circle<String> = Circle::new();
+    assert!(circle.current.is_none());
+    assert!(circle.left.is_empty());
+    assert!(circle.right.is_empty());
+}
+
+#[test]
+fn insertion() {
+    let mut circle: Circle<String> = Circle::new();
+
+    // insert a single element
+    circle.insert("Hello!".to_string());
+    assert!(circle.current.is_some());
+    assert_eq!(circle.current.as_ref().unwrap(), &"Hello!".to_string());
+    assert!(circle.left.is_empty());
+    assert!(circle.right.is_empty());
+
+    // insert another and check that the current element gets pushed to the right
+    circle.insert("World!".to_string());
+    assert!(circle.current.is_some());
+    assert_eq!(circle.current.as_ref().unwrap(), &"World!".to_string());
+    assert!(circle.left.is_empty());
+    assert!(!circle.right.is_empty());
+    assert_eq!(circle.right.front().unwrap(), &"Hello!".to_string());
+}
+
+#[test]
+fn rotation() {
+    let mut circle: Circle<String> = Circle::new();
+
+    // insert three elements
+    circle.insert("world!".to_string());
+    circle.insert("there,".to_string());
+    circle.insert("Hi".to_string());
+
+    // rotate zero places
+    circle.rotate(0);
+    assert_eq!(circle.current.as_ref().unwrap(), &"Hi".to_string());
+
+    // rotate all the way clockwise
+    circle.rotate(1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"there,".to_string());
+    circle.rotate(1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"world!".to_string());
+    circle.rotate(1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"Hi".to_string());
+
+    // rotate all the way counterclockwise
+    circle.rotate(-1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"world!".to_string());
+    circle.rotate(-1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"there,".to_string());
+    circle.rotate(-1);
+    assert_eq!(circle.current.as_ref().unwrap(), &"Hi".to_string());
+
+    // jump clockwise
+    circle.rotate(7);
+    assert_eq!(circle.current.as_ref().unwrap(), &"there,".to_string());
+
+    // jump counterclockwise
+    circle.rotate(-7);
+    assert_eq!(circle.current.as_ref().unwrap(), &"Hi".to_string());
 }
