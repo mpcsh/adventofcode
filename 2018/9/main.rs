@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fmt};
 use std::collections::VecDeque;
 
 struct Circle<T> {
@@ -16,11 +16,21 @@ impl<T: std::fmt::Debug> Circle<T> {
         }
     }
 
-    fn insert(self: &mut Circle<T>, elem: T) {
+    fn insert(&mut self, elem: T) {
         let _ = self.current
             .take()
             .map(|e| self.right.push_front(e));
         self.current = Some(elem);
+    }
+
+    fn remove(&mut self) -> Option<T> {
+        // take out the current value
+        let ret = self.current.take();
+
+        // take from right
+        self.right.pop_front().map(|e| self.current = Some(e));
+
+        ret
     }
 
     fn rotate_clockwise(&mut self) {
@@ -28,7 +38,9 @@ impl<T: std::fmt::Debug> Circle<T> {
         self.current.take().map(|e| self.left.push_back(e));
 
         // rotate the lists
-        self.left.pop_front().map(|e| self.right.push_back(e));
+        if self.left.len() > self.right.len() {
+            self.left.pop_front().map(|e| self.right.push_back(e));
+        }
 
         // take from right
         self.right.pop_front().map(|e| self.current = Some(e));
@@ -39,14 +51,16 @@ impl<T: std::fmt::Debug> Circle<T> {
         self.current.take().map(|e| self.right.push_front(e));
 
         // rotate the lists
-        self.right.pop_back().map(|e| self.left.push_front(e));
+        if self.right.len() > self.left.len() {
+            self.right.pop_back().map(|e| self.left.push_front(e));
+        };
 
         // take from left
         self.left.pop_back().map(|e| self.current = Some(e));
     }
 
     // positive num_rot goes clockwise, negative num_rot goes counterclockwise
-    fn rotate(self: &mut Circle<T>, num_rot: i64) {
+    fn rotate(&mut self, num_rot: i64) {
             if num_rot >= 0 {
                 for _ in 0..num_rot.abs() {
                     self.rotate_clockwise();
@@ -58,37 +72,61 @@ impl<T: std::fmt::Debug> Circle<T> {
             };
     }
 
+    // fn size(&self) -> usize {
+    //     self.left.len() + self.right.len() + 1
+    // }
+}
 
-    fn print(&mut self) -> () {
+impl<T: fmt::Debug> fmt::Debug for Circle<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for elem in self.left.iter() {
-            print!("{:?} ", elem);
+            write!(f, "{:?} ", elem)?;
         };
 
         match &self.current {
-            Some(elem) => print!("({:?}) ", elem),
-            None => print!("")
+            Some(elem) => write!(f, "({:?}) ", elem)?,
+            None => write!(f, "")?
         };
 
         for elem in self.right.iter() {
-            print!("{:?} ", elem);
-
+            write!(f, "{:?} ", elem)?;
         };
-        print!("\n");
+
+        Ok(())
     }
 }
 
-fn part_1(num_players: usize, num_marbles: usize) -> u64 {
+fn play(num_players: usize, num_marbles: u64) -> u64 {
+    let mut circle: Circle<u64> = Circle::new();
+    let mut scores: Vec<u64> = vec![0; num_players];
+    let mut remaining_marbles: Vec<u64> = (0..(num_marbles + 1)).rev().collect();
+    let mut player = 0;
+    while let Some(next) = remaining_marbles.pop() {
+        if next == 0 || next % 23 != 0 {
+            circle.rotate(2);
+            circle.insert(next);
+        }
+        else {
+            scores[player] += next;
+            circle.rotate(-7);
+            scores[player] += circle.remove().unwrap();
+        };
 
-    0
+        player += 1;
+        player %= num_players;
+    };
+
+    scores.iter().max().cloned().unwrap()
 }
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
 
     let num_players = args[1].parse::<usize>().unwrap();
-    let num_marbles = args[2].parse::<usize>().unwrap();
+    let num_marbles = args[2].parse::<u64>().unwrap();
 
-    println!("Part 1: highest score = {}", part_1(num_players, num_marbles));
+    println!("Part 1: highest score = {}", play(num_players, num_marbles));
+    println!("Part 2: highest score = {}", play(num_players, num_marbles * 100));
 
     Ok(())
 }
