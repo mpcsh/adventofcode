@@ -44,6 +44,16 @@ impl Point {
 
         ret
     }
+
+    fn has_neighbor(&self, points: &Vec<Point>) -> bool {
+        for neighbor in self.neighbors().iter() {
+            if points.contains(neighbor) {
+                return true
+            };
+
+        };
+        false
+    }
 }
 
 impl fmt::Debug for Point {
@@ -58,6 +68,38 @@ impl PartialEq for Point {
     }
 }
 
+fn print_message(points: &Vec<Point>) {
+    let mut x_min = 0;
+    let mut y_min = 0;
+    let mut x_max = 0;
+    let mut y_max = 0;
+    for point in points.iter() {
+        if point.x > x_max {
+            x_max = point.x;
+        };
+        if point.y > y_max {
+            y_max = point.y;
+        };
+        if point.x < x_min {
+            x_min = point.x;
+        };
+        if point.y < y_min {
+            y_min = point.y;
+        };
+    };
+    for x in x_min..(x_max + 1) {
+        print!("\n");
+        for y in y_min..(y_max + 1) {
+            if points.contains(&Point {x: x, y: y, v_x: 0, v_y: 0}) {
+                print!("#");
+            } else {
+                print!(".")
+            };
+        };
+    };
+    print!("\n");
+}
+
 fn part_1(mut points: Vec<Point>) -> Vec<Point> {
     let mut all_have_neighbors = false;
     let mut x_max = 0;
@@ -65,6 +107,7 @@ fn part_1(mut points: Vec<Point>) -> Vec<Point> {
     let mut y_max = 0;
     let mut y_min = 0;
     while !all_have_neighbors {
+        print_message(&points);
         // travel
         for point in points.iter_mut() {
             point.travel();
@@ -86,13 +129,7 @@ fn part_1(mut points: Vec<Point>) -> Vec<Point> {
         for x in x_min..(x_max + 1) {
             for y in y_min..(y_max + 1) {
                 let curr_point = Point {x: x, y: y, v_x: 0, v_y: 0};
-                let mut point_has_neighbor = false;
-                for neighbor in curr_point.neighbors().iter() {
-                    if points.contains(neighbor) {
-                        point_has_neighbor = true;
-                    };
-                };
-                if !point_has_neighbor {
+                if !curr_point.has_neighbor(&points) {
                     all_have_neighbors = false;
                 };
             };
