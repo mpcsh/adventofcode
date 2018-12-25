@@ -1,4 +1,5 @@
 use std::{env, fmt, fs};
+use std::cmp::PartialEq;
 
 struct Point {
     x: i64,
@@ -10,7 +11,7 @@ struct Point {
 impl Point {
     fn new(line: String) -> Self {
         let tokens = line
-            .split(|c: char| !c.is_ascii_digit())
+            .split(|c: char| !c.is_ascii_digit() && c != '-')
             .filter(|&s| s != "")
             .map(|s| s.parse::<i64>().unwrap())
             .collect::<Vec<i64>>();
@@ -46,13 +47,7 @@ impl Point {
     }
 
     fn has_neighbor(&self, points: &Vec<Point>) -> bool {
-        for neighbor in self.neighbors().iter() {
-            if points.contains(neighbor) {
-                return true
-            };
-
-        };
-        false
+        self.neighbors().iter().any(|n| points.contains(n))
     }
 }
 
@@ -69,10 +64,10 @@ impl PartialEq for Point {
 }
 
 fn print_message(points: &Vec<Point>) {
-    let mut x_min = 0;
-    let mut y_min = 0;
-    let mut x_max = 0;
-    let mut y_max = 0;
+    let mut x_min = points[0].x;
+    let mut y_min = points[0].y;
+    let mut x_max = points[0].x;
+    let mut y_max = points[0].y;
     for point in points.iter() {
         if point.x > x_max {
             x_max = point.x;
@@ -87,9 +82,9 @@ fn print_message(points: &Vec<Point>) {
             y_min = point.y;
         };
     };
-    for x in x_min..(x_max + 1) {
+    for y in y_min..(y_max + 1) {
         print!("\n");
-        for y in y_min..(y_max + 1) {
+        for x in x_min..(x_max + 1) {
             if points.contains(&Point {x: x, y: y, v_x: 0, v_y: 0}) {
                 print!("#");
             } else {
@@ -97,46 +92,21 @@ fn print_message(points: &Vec<Point>) {
             };
         };
     };
-    print!("\n");
+    println!("\n");
 }
 
-fn part_1(mut points: Vec<Point>) -> Vec<Point> {
-    let mut all_have_neighbors = false;
-    let mut x_max = 0;
-    let mut x_min = 0;
-    let mut y_max = 0;
-    let mut y_min = 0;
-    while !all_have_neighbors {
-        print_message(&points);
-        // travel
-        for point in points.iter_mut() {
-            point.travel();
-            if point.x > x_max {
-                x_max = point.x;
-            };
-            if point.y > y_max {
-                y_max = point.y;
-            };
-            if point.x < x_min {
-                x_min = point.x;
-            };
-            if point.y < y_min {
-                y_min = point.y;
-            };
-        };
+fn simulate(mut points: Vec<Point>) -> (Vec<Point>, u64) {
+    let mut num_seconds = 0;
+    loop {
+        // move each point
+        points.iter_mut().for_each(|p| p.travel());
+        num_seconds += 1;
+
         // check if all have neighbors
-        all_have_neighbors = true;
-        for x in x_min..(x_max + 1) {
-            for y in y_min..(y_max + 1) {
-                let curr_point = Point {x: x, y: y, v_x: 0, v_y: 0};
-                if !curr_point.has_neighbor(&points) {
-                    all_have_neighbors = false;
-                };
-            };
+        if points.iter().all(|p| p.has_neighbor(&points)) {
+            return (points, num_seconds);
         };
     };
-
-    points
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -150,7 +120,9 @@ fn main() -> Result<(), std::io::Error> {
         };
     };
 
-    let message = part_1(points);
-    println!("{:?}", message);
+    let (message, num_seconds) = simulate(points);
+    println!("Number of seconds to resolve = {}", num_seconds);
+    print_message(&message);
+
     Ok(())
 }
