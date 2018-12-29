@@ -11,41 +11,43 @@ fn state_to_string(slice: &[(char, i64)]) -> String {
         .collect()
 }
 
-// fn print_state(state: &State) {
-//     println!("{}", state_to_string(&state[..]))
-// }
+fn print_state(state: &State) {
+    println!("{}", state_to_string(&state[..]))
+}
 
 fn should_sprout(slice: &[(char, i64)], rules: &HashSet<String>) -> bool {
     rules.contains(&state_to_string(slice))
 }
 
-fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64, u64) {
+fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64) {
     // find meeting point
-    let &mut tortoise = &evolve(init_state, rules);
-    let &mut hare = &evolve(&evolve(init_state, rules), rules);
+    let mut tortoise = evolve(init_state, rules);
+    let mut hare = evolve(&evolve(init_state, rules), rules);
     while tortoise != hare {
-        tortoise = &evolve(tortoise, rules);
-        hare = &evolve(&evolve(hare, rules), rules);
+        tortoise = evolve(&tortoise, rules);
+        hare = evolve(&evolve(&hare, rules), rules);
+        print_state(&tortoise);
+        print_state(&hare);
     };
 
     // find position of first repition
     let mut first_rep = 0;
-    tortoise = &init_state;
+    tortoise = evolve(&init_state, rules);
     while tortoise != hare {
-        tortoise = &evolve(tortoise, rules);
-        hare = &evolve(hare, rules);
+        tortoise = evolve(&tortoise, rules);
+        hare = evolve(&hare, rules);
         first_rep += 1;
     };
 
     // find length of shortest cycle
     let mut cycle_length = 1;
-    hare = &evolve(tortoise, rules);
+    hare = evolve(&tortoise, rules);
     while tortoise != hare {
-        hare = &evolve(hare, rules);
+        hare = evolve(&hare, rules);
         cycle_length += 1;
     };
 
-    (tortoise, first_rep, cycle_length)
+    (tortoise, cycle_length)
 }
 
 fn evolve(state: &State, rules: &HashSet<String>) -> State {
@@ -87,10 +89,12 @@ fn part_1(state: &State, rules: &HashSet<String>) -> i64 {
 }
 
 fn part_2(state: State, rules: &HashSet<String>) -> i64 {
-    let (cycle_start_state, cycle_start_generation, cycle_len) = find_cycle(&state, rules);
-
-    // pot_sum(final_state)
-    0
+    let (cycle_start_state, cycle_len) = find_cycle(&state, rules);
+    let mut final_state = cycle_start_state;
+    for _ in 0..(50000000000 % cycle_len) {
+        final_state = evolve(&final_state, rules);
+    };
+    pot_sum(&final_state)
 }
 
 fn main() -> Result<(), std::io::Error> {
