@@ -11,46 +11,86 @@ fn state_to_string(slice: &[(char, i64)]) -> String {
         .collect()
 }
 
-fn print_state(state: &State) {
-    println!("{}", state_to_string(&state[..]))
-}
+// fn print_state(state: &State) {
+//     println!("{}", state_to_string(&state[..]))
+// }
 
 fn should_sprout(slice: &[(char, i64)], rules: &HashSet<String>) -> bool {
     rules.contains(&state_to_string(slice))
 }
 
-fn evolve(mut initial_state: State, rules: &HashSet<String>, num_generations: u64) -> State {
-    if num_generations == 0 {
-        return initial_state;
+fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64, u64) {
+    // find meeting point
+    let &mut tortoise = &evolve(init_state, rules);
+    let &mut hare = &evolve(&evolve(init_state, rules), rules);
+    while tortoise != hare {
+        tortoise = &evolve(tortoise, rules);
+        hare = &evolve(&evolve(hare, rules), rules);
     };
 
-    // pad either side with empty pots if necessary
-    if state_to_string(&initial_state[0..5]).contains('#') {
-        let starting_index = initial_state[0].1;
-        for i in 0..5 {
-            initial_state.insert(0, ('.', starting_index - i - 1));
-        };
-    };
-    if state_to_string(&initial_state[(initial_state.len() - 5)..]).contains('#') {
-        let ending_index = initial_state[initial_state.len() - 1].1;
-        let mut pad: State = Vec::new();
-        for i in 0..5 {
-            pad.push(('.', ending_index + i + 1));
-        };
-        initial_state.append(&mut pad);
+    // find position of first repition
+    let mut first_rep = 0;
+    tortoise = &init_state;
+    while tortoise != hare {
+        tortoise = &evolve(tortoise, rules);
+        hare = &evolve(hare, rules);
+        first_rep += 1;
     };
 
-    // start the evolution process!
+    // find length of shortest cycle
+    let mut cycle_length = 1;
+    hare = &evolve(tortoise, rules);
+    while tortoise != hare {
+        hare = &evolve(hare, rules);
+        cycle_length += 1;
+    };
+
+    (tortoise, first_rep, cycle_length)
+}
+
+fn evolve(state: &State, rules: &HashSet<String>) -> State {
     let mut new_state = Vec::new();
-    for i in 2..(initial_state.len() - 2) {
-        if should_sprout(&initial_state[(i - 2)..(i + 3)], rules) {
-            new_state.push(('#', initial_state[i].1));
+    let mut padded_state = state.clone();
+    for _ in 0..4 {
+        let front_idx = padded_state[0].1 - 1;
+        padded_state.insert(0, ('.', front_idx));
+        let back_idx = padded_state[padded_state.len() - 1].1 + 1;
+        padded_state.push(('.', back_idx));
+    };
+    for i in 2..(padded_state.len() - 2) {
+        if should_sprout(&padded_state[(i - 2)..(i + 3)], rules) {
+            new_state.push(('#', padded_state[i].1));
         } else {
-            new_state.push(('.', initial_state[i].1));
+            new_state.push(('.', padded_state[i].1));
         };
     };
 
-    evolve(new_state, &rules, num_generations - 1)
+    new_state
+}
+
+fn pot_sum(state: &State) -> i64 {
+    state.iter().fold(0, |sum, x| {
+        if x.0 == '#' {
+            sum + x.1
+        } else {
+            sum
+        }
+    })
+}
+
+fn part_1(state: &State, rules: &HashSet<String>) -> i64 {
+    let mut final_state = state.clone();
+    for _ in 0..20 {
+        final_state = evolve(&final_state, rules);
+    };
+    pot_sum(&final_state)
+}
+
+fn part_2(state: State, rules: &HashSet<String>) -> i64 {
+    let (cycle_start_state, cycle_start_generation, cycle_len) = find_cycle(&state, rules);
+
+    // pot_sum(final_state)
+    0
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -89,14 +129,11 @@ fn main() -> Result<(), std::io::Error> {
         )
         .collect::<HashSet<String>>();
 
-    let final_state = evolve(initial_state, &rules, 20);
-    let pot_sum = final_state.iter().fold(0, |sum, x| if x.0 == '#' {
-                                                        sum + x.1
-                                                    } else {
-                                                        sum
-                                                    });
-    println!("part 1: the sum of the pot numbers is {}", pot_sum);
-    print_state(&final_state);
+    println!("Part 1: the sum of the pot numbers is {}",
+             part_1(&initial_state, &rules));
+
+    println!("Part 2: the sum of the pot numbers is {}",
+             part_2(initial_state.clone(), &rules));
 
     Ok(())
 }
