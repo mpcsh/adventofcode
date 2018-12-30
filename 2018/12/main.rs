@@ -4,22 +4,6 @@ use std::collections::HashSet;
 
 type State = Vec<(char, i64)>;
 
-fn cut_dots(mut state: State) -> State {
-    let mut curr_plant = state[0].0;
-    while curr_plant != '#' {
-        state.pop();
-        curr_plant = state[0].0;
-    };
-    let mut length = state.len();
-    curr_plant = state[length - 1].0;
-    while curr_plant != '#' && length != 1 {
-        length = state.len();
-        state.remove(length - 1);
-        curr_plant = state[length - 2].0;
-    };
-    state
-}
-
 fn state_equals(state_1: State, state_2: State) -> bool {
     cut_dots(state_1) == cut_dots(state_2)
 }
@@ -35,6 +19,23 @@ fn print_state(state: &State) {
     println!("{}", state_to_string(&state[..]))
 }
 
+fn cut_dots(mut state: State) -> State {
+    let mut curr_plant = state[0].0;
+    while curr_plant != '#' && state.len() > 1 {
+        state.remove(0);
+        curr_plant = state[0].0;
+    };
+    let mut length = state.len();
+    curr_plant = state[length - 1].0;
+    while curr_plant != '#' && length != 1 {
+        length = state.len();
+        state.pop();
+        curr_plant = state[length - 2].0;
+    };
+    state
+}
+
+
 fn should_sprout(slice: &[(char, i64)], rules: &HashSet<String>) -> bool {
     rules.contains(&state_to_string(slice))
 }
@@ -46,8 +47,6 @@ fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64) {
     while !state_equals(tortoise.clone(), hare.clone()) {
         tortoise = evolve(&tortoise, rules);
         hare = evolve(&evolve(&hare, rules), rules);
-        print_state(&tortoise);
-        print_state(&hare);
     };
 
     // find position of first repitition
@@ -107,12 +106,15 @@ fn part_1(state: &State, rules: &HashSet<String>) -> i64 {
 }
 
 fn part_2(state: State, rules: &HashSet<String>) -> i64 {
-    let (cycle_start_state, cycle_len) = find_cycle(&state, rules);
-    let mut final_state = cycle_start_state;
-    for _ in 0..(50000000000 % cycle_len) {
+    // let (cycle_start_state, cycle_len) = find_cycle(&state, rules);
+    // let mut final_state = cycle_start_state;
+    let mut final_state = state;
+    for _ in 0..(50000000000 as u64) { //% cycle_len) {
         final_state = evolve(&final_state, rules);
+        println!("{}", pot_sum(&final_state));
     };
-    pot_sum(&final_state)
+    // pot_sum(&final_state)
+    0
 }
 
 fn main() -> Result<(), std::io::Error> {
