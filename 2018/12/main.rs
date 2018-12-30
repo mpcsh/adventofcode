@@ -4,6 +4,26 @@ use std::collections::HashSet;
 
 type State = Vec<(char, i64)>;
 
+fn cut_dots(mut state: State) -> State {
+    let mut curr_plant = state[0].0;
+    while curr_plant != '#' {
+        state.pop();
+        curr_plant = state[0].0;
+    };
+    let mut length = state.len();
+    curr_plant = state[length - 1].0;
+    while curr_plant != '#' && length != 1 {
+        length = state.len();
+        state.remove(length - 1);
+        curr_plant = state[length - 2].0;
+    };
+    state
+}
+
+fn state_equals(state_1: State, state_2: State) -> bool {
+    cut_dots(state_1) == cut_dots(state_2)
+}
+
 fn state_to_string(slice: &[(char, i64)]) -> String {
     slice
         .iter()
@@ -23,26 +43,24 @@ fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64) {
     // find meeting point
     let mut tortoise = evolve(init_state, rules);
     let mut hare = evolve(&evolve(init_state, rules), rules);
-    while tortoise != hare {
+    while !state_equals(tortoise.clone(), hare.clone()) {
         tortoise = evolve(&tortoise, rules);
         hare = evolve(&evolve(&hare, rules), rules);
         print_state(&tortoise);
         print_state(&hare);
     };
 
-    // find position of first repition
-    let mut first_rep = 0;
+    // find position of first repitition
     tortoise = evolve(&init_state, rules);
-    while tortoise != hare {
+    while !state_equals(tortoise.clone(), hare.clone()) {
         tortoise = evolve(&tortoise, rules);
         hare = evolve(&hare, rules);
-        first_rep += 1;
     };
 
     // find length of shortest cycle
     let mut cycle_length = 1;
     hare = evolve(&tortoise, rules);
-    while tortoise != hare {
+    while !state_equals(tortoise.clone(), hare.clone()) {
         hare = evolve(&hare, rules);
         cycle_length += 1;
     };
