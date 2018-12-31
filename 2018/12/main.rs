@@ -4,9 +4,9 @@ use std::collections::HashSet;
 
 type State = Vec<(char, i64)>;
 
-fn state_equals(state_1: State, state_2: State) -> bool {
-    cut_dots(state_1) == cut_dots(state_2)
-}
+// fn state_equals(state_1: State, state_2: State) -> bool {
+//     cut_dots(state_1) == cut_dots(state_2)
+// }
 
 fn state_to_string(slice: &[(char, i64)]) -> String {
     slice
@@ -40,31 +40,40 @@ fn should_sprout(slice: &[(char, i64)], rules: &HashSet<String>) -> bool {
     rules.contains(&state_to_string(slice))
 }
 
-fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, u64) {
+fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, i64) {
     // find meeting point
     let mut tortoise = evolve(init_state, rules);
     let mut hare = evolve(&evolve(init_state, rules), rules);
-    while !state_equals(tortoise.clone(), hare.clone()) {
+    let mut prev_difference = 0;
+    let mut generation = 0;
+    while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
+        prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
         tortoise = evolve(&tortoise, rules);
         hare = evolve(&evolve(&hare, rules), rules);
+        generation += 1;
     };
 
-    // find position of first repitition
-    tortoise = evolve(&init_state, rules);
-    while !state_equals(tortoise.clone(), hare.clone()) {
-        tortoise = evolve(&tortoise, rules);
-        hare = evolve(&hare, rules);
-    };
+    // // find position of first repetition
+    // tortoise = evolve(&init_state, rules);
+    // let mut generation = 0;
+    // prev_difference = 0;
+    // while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
+    //     prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
+    //     tortoise = evolve(&tortoise, rules);
+    //     hare = evolve(&hare, rules);
+    //     generation += 1;
+    // };
 
-    // find length of shortest cycle
-    let mut cycle_length = 1;
-    hare = evolve(&tortoise, rules);
-    while !state_equals(tortoise.clone(), hare.clone()) {
-        hare = evolve(&hare, rules);
-        cycle_length += 1;
-    };
+    // // find length of shortest cycle
+    // let mut cycle_length = 1;
+    // hare = evolve(&tortoise, rules);
+    // while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
+    //     prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
+    //     hare = evolve(&hare, rules);
+    //     cycle_length += 1;
+    // };
 
-    (tortoise, cycle_length)
+    (hare, generation)
 }
 
 fn evolve(state: &State, rules: &HashSet<String>) -> State {
@@ -106,15 +115,13 @@ fn part_1(state: &State, rules: &HashSet<String>) -> i64 {
 }
 
 fn part_2(state: State, rules: &HashSet<String>) -> i64 {
-    // let (cycle_start_state, cycle_len) = find_cycle(&state, rules);
-    // let mut final_state = cycle_start_state;
-    let mut final_state = state;
-    for _ in 0..(50000000000 as u64) { //% cycle_len) {
-        final_state = evolve(&final_state, rules);
-        println!("{}", pot_sum(&final_state));
-    };
-    // pot_sum(&final_state)
-    0
+    let (first_cycle_state, generation) = find_cycle(&state, rules);
+    let sum_at_cycle_start = pot_sum(&first_cycle_state);
+    let next_sum = pot_sum(&evolve(&first_cycle_state, rules));
+    let difference = next_sum - sum_at_cycle_start;
+    let remaining_gen = 50000000000 - generation;
+    println!("{}, {}, {}", pot_sum(&first_cycle_state), pot_sum(&evolve(&first_cycle_state, rules)), pot_sum(&evolve(&evolve(&first_cycle_state, rules), rules)));
+    sum_at_cycle_start + (difference * remaining_gen)
 }
 
 fn main() -> Result<(), std::io::Error> {
