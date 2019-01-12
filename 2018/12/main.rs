@@ -4,10 +4,6 @@ use std::collections::HashSet;
 
 type State = Vec<(char, i64)>;
 
-// fn state_equals(state_1: State, state_2: State) -> bool {
-//     cut_dots(state_1) == cut_dots(state_2)
-// }
-
 fn state_to_string(slice: &[(char, i64)]) -> String {
     slice
         .iter()
@@ -35,45 +31,8 @@ fn cut_dots(mut state: State) -> State {
     state
 }
 
-
 fn should_sprout(slice: &[(char, i64)], rules: &HashSet<String>) -> bool {
     rules.contains(&state_to_string(slice))
-}
-
-fn find_cycle(init_state: &State, rules: &HashSet<String>) -> (State, i64) {
-    // find meeting point
-    let mut tortoise = evolve(init_state, rules);
-    let mut hare = evolve(&evolve(init_state, rules), rules);
-    let mut prev_difference = 0;
-    let mut generation = 0;
-    while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
-        prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
-        tortoise = evolve(&tortoise, rules);
-        hare = evolve(&evolve(&hare, rules), rules);
-        generation += 1;
-    };
-
-    // // find position of first repetition
-    // tortoise = evolve(&init_state, rules);
-    // let mut generation = 0;
-    // prev_difference = 0;
-    // while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
-    //     prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
-    //     tortoise = evolve(&tortoise, rules);
-    //     hare = evolve(&hare, rules);
-    //     generation += 1;
-    // };
-
-    // // find length of shortest cycle
-    // let mut cycle_length = 1;
-    // hare = evolve(&tortoise, rules);
-    // while pot_sum(&hare) - pot_sum(&tortoise) != prev_difference {
-    //     prev_difference = pot_sum(&hare) - pot_sum(&tortoise);
-    //     hare = evolve(&hare, rules);
-    //     cycle_length += 1;
-    // };
-
-    (hare, generation)
 }
 
 fn evolve(state: &State, rules: &HashSet<String>) -> State {
@@ -114,13 +73,35 @@ fn part_1(state: &State, rules: &HashSet<String>) -> i64 {
     pot_sum(&final_state)
 }
 
+fn find_rep(mut state: State, rules: &HashSet<String>) -> (State, i64) {
+    let mut next_state = evolve(&state, rules);
+    let mut next_next_state = evolve(&evolve(&state, rules), rules);
+    let mut first_difference = pot_sum(&next_state) - pot_sum(&state);
+    let mut second_difference = pot_sum(&next_next_state) - pot_sum(&next_state);
+    let mut prev_difference = 0;
+    let mut generation = 0;
+
+    while first_difference != second_difference || prev_difference != first_difference {
+        prev_difference = first_difference;
+        let next_gen = evolve(&next_next_state, rules);
+        state = next_state;
+        next_state = next_next_state;
+        next_next_state = next_gen;
+        first_difference = second_difference;
+        second_difference = pot_sum(&next_next_state) - pot_sum(&next_state);
+        generation += 1;
+    };
+
+    (state, generation)
+
+}
+
 fn part_2(state: State, rules: &HashSet<String>) -> i64 {
-    let (first_cycle_state, generation) = find_cycle(&state, rules);
+    let (first_cycle_state, generation) = find_rep(state.clone(), rules);
     let sum_at_cycle_start = pot_sum(&first_cycle_state);
     let next_sum = pot_sum(&evolve(&first_cycle_state, rules));
     let difference = next_sum - sum_at_cycle_start;
     let remaining_gen = 50000000000 - generation;
-    println!("{}, {}, {}", pot_sum(&first_cycle_state), pot_sum(&evolve(&first_cycle_state, rules)), pot_sum(&evolve(&evolve(&first_cycle_state, rules), rules)));
     sum_at_cycle_start + (difference * remaining_gen)
 }
 
