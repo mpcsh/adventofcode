@@ -5,8 +5,10 @@ use std::fs;
 
 use std::fmt;
 use std::cmp::{PartialEq, Eq};
+use std::collections::VecDeque;
 
 use itertools::Itertools;
+use log::debug;
 
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -72,7 +74,7 @@ impl fmt::Debug for Op {
 struct Instr {
     op: Op,
     modes: Vec<Mode>,
-    num_params: usize
+    arity: usize
 }
 
 impl Instr {
@@ -84,7 +86,7 @@ impl Instr {
         let mode3 = Mode::from_i64(i / 10000 % 10);
         let modes = vec!(mode1, mode2, mode3);
 
-        let num_params = match op {
+        let arity = match op {
             Op::Add | Op::Mul => 3,
             Op::Inp | Op::Out => 1,
             Op::Jnz | Op::Jez => 2,
@@ -92,7 +94,7 @@ impl Instr {
             Op::Hlt => 0
         };
 
-        Instr { op, modes, num_params }
+        Instr { op, modes, arity }
     }
 }
 
@@ -105,31 +107,61 @@ impl fmt::Debug for Instr {
 
 type Program = Vec<i64>;
 
-fn eval<'a, I>(program: &mut Program, mut inputs: I) -> i64
-where
-    I: Iterator<Item = &'a i64> + 'a,
-{
-    let mut output = None;
+#[derive(PartialEq, Eq, Debug)]
+enum State {
+    Boot,
+    Running,
+    InputWait,
+    Output,
+    Halted
+}
 
-    let mut eip = 0;
+struct Node {
+    label: char,
+
+    state: State,
+    program: Program,
+    ip: usize,
+
+    input: VecDeque<i64>,
+    output: VecDeque<i64>,
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Node {} in state {:?}\n\
+                    \tInstruction pointer: {}\n\
+                    \tInput: {:?}\n\
+                    \tOutput: {:?}",
+                self.label, self.state,
+                self.ip,
+                self.input,
+                self.output)
+    }
+}
+
+fn run(node: &mut Node) -> () {
     loop {
-        let instr = Instr::from_i64(program[eip]);
-        if instr.op == Op::Hlt {
-            return output.expect("No output!");
-        };
+        node.state = State::Running;
+
+        let instr = Instr::from_i64(node.program[node.ip]);
 
         let mut params = Vec::new();
-        for i in 0..instr.num_params {
-            params.push((instr.modes[i], program[eip + i + 1]));
+        for i in 0..instr.arity {
+            params.push((instr.modes[i], node.program[node.ip + i + 1]));
         };
 
         let get_param = |(mode, param)| {
             match mode {
-                Mode::Pos => program[param as usize],
+                Mode::Pos => node.program[param as usize],
                 Mode::Imm => param
             }
         };
         let get_idx = |(_, param)| param as usize;
+
+        debug!("Node {}: executing instruction {:?} with parameters {:?}",
+               node.label,
+               instr.op, params);
 
         let mut jmp_occurred = false;
         match instr.op {
@@ -137,33 +169,58 @@ where
                 let val1 = get_param(params[0]);
                 let val2 = get_param(params[1]);
                 let ret_idx = get_idx(params[2]);
-                program[ret_idx] = val1 + val2;
+                debug!("Node {}: storing {} + {} = {} at index {}",
+                       node.label,
+                       val1, val2, val1 + val2,
+                       ret_idx);
+                node.program[ret_idx] = val1 + val2;
             },
             Op::Mul => {
                 let val1 = get_param(params[0]);
                 let val2 = get_param(params[1]);
                 let ret_idx = get_idx(params[2]);
-                program[ret_idx] = val1 * val2;
+                debug!("Node {}: storing {} * {} = {} at index {}",
+                       node.label,
+                       val1, val2, val1 * val2,
+                       ret_idx);
+                node.program[ret_idx] = val1 * val2;
             },
             Op::Inp => {
-                let ret_idx = get_idx(params[0]);
-                program[ret_idx] = *inputs.next().unwrap();
+                match node.input.pop_front() {
+                    Some(input) => {
+                        let idx = get_idx(params[0]);
+                        debug!("Node {}: storing input {} at index {}",
+                               node.label,
+                               input, idx);
+                        node.program[idx] = input;
+                    },
+                    None => {
+                        debug!("Node {}: no input available",
+                               node.label);
+                        node.state = State::InputWait;
+                        return;
+                    }
+                };
             },
             Op::Out => {
-                output.expect_none("Multiple outputs!");
-                output = Some(get_param(params[0]));
+                let output = get_param(params[0]);
+                debug!("Node {}: outputting value {}",
+                       node.label,
+                       output);
+                node.output.push_back(output);
+                node.state = State::Output;
             },
             Op::Jnz => {
                 let val = get_param(params[0]);
                 if val != 0 {
-                    eip = get_param(params[1]) as usize;
+                    node.ip = get_param(params[1]) as usize;
                     jmp_occurred = true;
                 };
             },
             Op::Jez => {
                 let val = get_param(params[0]);
                 if val == 0 {
-                    eip = get_param(params[1]) as usize;
+                    node.ip = get_param(params[1]) as usize;
                     jmp_occurred = true;
                 };
             },
@@ -172,42 +229,96 @@ where
                 let val2 = get_param(params[1]);
                 let ret_idx = get_idx(params[2]);
                 let ret = if val1 < val2 { 1 } else { 0 };
-                program[ret_idx] = ret;
+                node.program[ret_idx] = ret;
             },
             Op::Eql => {
                 let val1 = get_param(params[0]);
                 let val2 = get_param(params[1]);
                 let ret_idx = get_idx(params[2]);
                 let ret = if val1 == val2 { 1 } else { 0 };
-                program[ret_idx] = ret;
+                node.program[ret_idx] = ret;
             },
-            opcode => panic!("Unknown opcode {:?}", opcode)
+            Op::Hlt => {
+                node.state = State::Halted;
+                return;
+            }
         };
 
         if !jmp_occurred {
-            eip += instr.num_params + 1;
+            node.ip += instr.arity + 1;
         };
     }
 }
 
-fn part1(program: &Program) -> () {
-    let max_output = [0, 1, 2, 3, 4]
-        .iter()
-        .permutations(5)
-        .map(|phases| {
-            phases
-                .iter()
-                .fold(0, |input, &&phase|
-                      eval(&mut program.to_vec(), [phase, input].iter()))
-        })
-        .max()
-        .unwrap();
 
+fn run_with_phases(program: &Program, phases: Vec<&i64>) -> i64 {
+    let labels = ['A', 'B', 'C', 'D', 'E'];
+    let mut nodes: Vec<Node> = labels
+        .iter()
+        .zip(phases.iter())
+        .map(|(&label, &&phase)| Node {
+            label,
+
+            state: State::Boot,
+            program: program.to_vec(),
+            ip: 0,
+
+            input: VecDeque::from(vec!(phase)),
+            output: VecDeque::new(),
+        })
+        .collect();
+
+    nodes[0].input.push_back(0);
+
+    let (mut curr_node, mut next_node) = (0, 1);
+    loop {
+        debug!("BEGIN RUN: {:?}", nodes[curr_node]);
+        run(&mut nodes[curr_node]);
+        debug!("END RUN: {:?}", nodes[curr_node]);
+        if nodes.iter().all(|node| node.state == State::Halted) {
+            break;
+        };
+        match nodes[curr_node].output.pop_front() {
+            Some(output) => {
+                nodes[next_node].input.push_back(output);
+            },
+            None => ()
+        };
+        curr_node += 1;
+        curr_node %= nodes.len();
+        next_node += 1;
+        next_node %= nodes.len();
+    }
+
+    let outputs = &nodes.last().expect("No last node!").output;
+    assert!(outputs.len() < 2, "Multiple outputs!");
+    *outputs.front().expect("No outputs!")
+}
+
+fn find_max_output(program: &Program, possible_phases: Vec<i64>) -> i64 {
+    possible_phases
+        .iter()
+        .permutations(possible_phases.len())
+        .map(|phases| run_with_phases(program, phases.to_vec()))
+        .max()
+        .expect("No maximum output!")
+}
+
+fn part1(program: &Program) -> () {
+    let max_output = find_max_output(program, vec!(0, 1, 2, 3, 4));
     println!("Part 1: {}", max_output);
 }
 
 
+fn part2(program: &Program) -> () {
+    let max_output = find_max_output(program, vec!(5, 6, 7, 8, 9));
+    println!("Part 2: {}", max_output);
+}
+
+
 fn main() -> Result<(), std::io::Error> {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
     let contents: String = fs::read_to_string(&args[1])?;
 
@@ -218,6 +329,7 @@ fn main() -> Result<(), std::io::Error> {
         .collect::<Vec<_>>();
 
     part1(&program);
+    part2(&program);
 
     Ok(())
 }
