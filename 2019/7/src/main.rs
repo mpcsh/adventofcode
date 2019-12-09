@@ -11,7 +11,7 @@ use itertools::Itertools;
 use log::debug;
 
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Pos = 0,
     Imm = 1
@@ -27,14 +27,8 @@ impl Mode {
     }
 }
 
-impl fmt::Debug for Mode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self as u64)
-    }
-}
 
-
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Op {
     Add = 1,
     Mul = 2,
@@ -61,12 +55,6 @@ impl Op {
             99 => Op::Hlt,
             _ => panic!("Unknown mode {}", i)
         }
-    }
-}
-
-impl fmt::Debug for Op {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self as u64)
     }
 }
 
@@ -112,7 +100,6 @@ enum State {
     Boot,
     Running,
     InputWait,
-    Output,
     Halted
 }
 
@@ -159,6 +146,8 @@ fn run(node: &mut Node) -> () {
         };
         let get_idx = |(_, param)| param as usize;
 
+        let ternary_setup = || (get_param(params[0]), get_param(params[1]), get_idx(params[2]));
+
         debug!("Node {}: executing instruction {:?} with parameters {:?}",
                node.label,
                instr.op, params);
@@ -166,37 +155,20 @@ fn run(node: &mut Node) -> () {
         let mut jmp_occurred = false;
         match instr.op {
             Op::Add => {
-                let val1 = get_param(params[0]);
-                let val2 = get_param(params[1]);
-                let ret_idx = get_idx(params[2]);
-                debug!("Node {}: storing {} + {} = {} at index {}",
-                       node.label,
-                       val1, val2, val1 + val2,
-                       ret_idx);
+                let (val1, val2, ret_idx) = ternary_setup();
                 node.program[ret_idx] = val1 + val2;
             },
             Op::Mul => {
-                let val1 = get_param(params[0]);
-                let val2 = get_param(params[1]);
-                let ret_idx = get_idx(params[2]);
-                debug!("Node {}: storing {} * {} = {} at index {}",
-                       node.label,
-                       val1, val2, val1 * val2,
-                       ret_idx);
+                let (val1, val2, ret_idx) = ternary_setup();
                 node.program[ret_idx] = val1 * val2;
             },
             Op::Inp => {
                 match node.input.pop_front() {
                     Some(input) => {
                         let idx = get_idx(params[0]);
-                        debug!("Node {}: storing input {} at index {}",
-                               node.label,
-                               input, idx);
                         node.program[idx] = input;
                     },
                     None => {
-                        debug!("Node {}: no input available",
-                               node.label);
                         node.state = State::InputWait;
                         return;
                     }
@@ -204,11 +176,7 @@ fn run(node: &mut Node) -> () {
             },
             Op::Out => {
                 let output = get_param(params[0]);
-                debug!("Node {}: outputting value {}",
-                       node.label,
-                       output);
                 node.output.push_back(output);
-                node.state = State::Output;
             },
             Op::Jnz => {
                 let val = get_param(params[0]);
@@ -225,16 +193,12 @@ fn run(node: &mut Node) -> () {
                 };
             },
             Op::Ltn => {
-                let val1 = get_param(params[0]);
-                let val2 = get_param(params[1]);
-                let ret_idx = get_idx(params[2]);
+                let (val1, val2, ret_idx) = ternary_setup();
                 let ret = if val1 < val2 { 1 } else { 0 };
                 node.program[ret_idx] = ret;
             },
             Op::Eql => {
-                let val1 = get_param(params[0]);
-                let val2 = get_param(params[1]);
-                let ret_idx = get_idx(params[2]);
+                let (val1, val2, ret_idx) = ternary_setup();
                 let ret = if val1 == val2 { 1 } else { 0 };
                 node.program[ret_idx] = ret;
             },
