@@ -2,12 +2,15 @@ use std::env;
 use std::fs;
 
 use std::fmt;
+use std::cmp::{PartialEq, Eq};
+use std::hash::Hash;
+use std::collections::HashMap;
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Point {
-    x: usize,
-    y: usize
+    x: i64,
+    y: i64
 }
 
 impl fmt::Debug for Point {
@@ -16,30 +19,26 @@ impl fmt::Debug for Point {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Line {
-    m: f64,
-    b: f64
-}
+impl Point {
+    fn point_diff(&self, p2: &Point) -> Self {
+        let p1 = self;
+        let dx = p2.x - p1.x;
+        let dy = p2.y - p1.y;
 
-impl fmt::Debug for Line {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "y = {}x + {}", self.m, self.b)
-    }
-}
-
-impl Line {
-    fn from_points(p1: &Point, p2: &Point) -> Self {
-        let (x1, y1) = (p1.x as f64, p1.y as f64);
-        let (x2, y2) = (p2.x as f64, p2.y as f64);
-        let m: f64 = (y2 - y1) / (x2 - x1);
-        let b: f64 = y1 - m*x1;
-
-        Line { m, b }
+        Point { x: dx, y: dy }
     }
 
-    fn plug_chug(&self, x: usize) -> f64 {
-        self.m * (x as f64) + self.b
+    fn normalize(&self) -> Self {
+        if self.x == 0 && self.y == 0 { return *self; };
+        let mut m = self.x;
+        let mut n = self.y;
+        while m != 0 {
+            let old_m = m;
+            m = n % m;
+            n = old_m;
+        };
+        let gcd = n.abs();
+        Point { x: self.x / gcd, y: self.y / gcd }
     }
 }
 
@@ -56,40 +55,49 @@ fn print_space(space: &Space) -> () {
         });
 }
 
-fn can_see_each_other(space: &Space, p1: &Point, p2: &Point) -> bool {
-    let line = Line::from_points(p1, p2);
 
-    for x in p1.x..=p2.x {
-        for y in p1.y..=p2.y {
-            if (x == p1.x && y == p1.y) || (x == p2.x && y == p2.y) {
-                continue;
-            };
+fn group_by_angle(space: &Space, p1: &Point) -> HashMap<Point, Vec<Point>> {
+    let mut grouped = HashMap::new();
 
-            println!("p1: {:?}, p2: {:?}, line: {:?}, p3: {:?}", p1, p2, line, Point { x, y });
-
-            if line.plug_chug(x) == y as f64 && space[x][y] {
-                return false;
-            };
-        }
-    }
-
-    true
-}
-
-fn get_visible_from(space: &Space, p1: &Point) -> Vec<Point> {
     space
         .iter()
         .enumerate()
-        .map(|(y, row)| {
-            row
-                .iter()
-                .enumerate()
-                .map(move |(x, loc)| (loc, Point { x, y }))
-                .filter(|(&loc, p2)| can_see_each_other(space, p1, &p2))
-        })
+        .for_each(|(y, row)| row
+            .iter()
+            .enumerate()
+            .filter(|(_, &loc)| loc)
+            .for_each(|(x, _)| {
+                let p2 = Point { x: x as i64, y: y as i64 };
+                let diff = p1.point_diff(&p2).normalize();
+                grouped.entry(diff).or_insert(Vec::new()).push(p2);
+            })
+        );
+
+    grouped
+}
+
+fn count_visible(space: &Space, p1: &Point) -> usize {
+    group_by_angle(space, p1).len() - 1
+}
+
+
+fn part1(space: &Space) -> () {
+    let (max_point, max_count) = space
+        .iter()
+        .enumerate()
+        .map(|(y, row)| row
+             .iter()
+             .enumerate()
+             .filter(|(_, &loc)| loc)
+             .map(move |(x, _)| {
+                 let p1 = Point { x: x as i64, y: y as i64 };
+                 (p1, count_visible(space, &p1))
+             }))
         .flatten()
-        .map(|(_, p2)| p2)
-        .collect()
+        .max_by(|(_, count1), (_, count2)| count1.cmp(&count2))
+        .expect("No maximum point!");
+
+    println!("Part 1: {:?} can see {} asteroids", max_point, max_count);
 }
 
 
@@ -119,11 +127,14 @@ fn main() -> Result<(), std::io::Error> {
     // let p4 = Point { x: 2, y: 6 };
     // println!("{}", can_see_each_other(&space, &p3, &p4));
 
-    let p5 = Point { x: 1, y: 0 };
-    let p6 = Point { x: 1, y: 3 };
-    println!("{}", can_see_each_other(&space, &p5, &p6));
+    // let p1 = Point { x: 0, y: 0 };
+    // let p2 = Point { x: 1, y: 3 };
+    // let p3 = Point { x: 1, y: 6 };
+    // let p4 = Point { x: 1, y: 9 };
+    // println!("{:?}", p4.point_diff(&p2).normalize());
 
     print_space(&space);
+    part1(&space);
 
     Ok(())
 }
