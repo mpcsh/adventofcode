@@ -310,13 +310,13 @@ fn execute(program: &Program, node_labels: Vec<char>, initial_inputs: HashMap<ch
 fn part1(program: &Program) -> () {
     let mut inputs = HashMap::new();
     inputs.insert('A', VecDeque::from(vec!(1)));
-    println!("{:?}", execute(&program, vec!('A'), inputs));
+    println!("Part 1: {:?}", execute(&program, vec!('A'), inputs));
 }
 
 fn part2(program: &Program) -> () {
     let mut inputs = HashMap::new();
     inputs.insert('A', VecDeque::from(vec!(2)));
-    println!("{:?}", execute(&program, vec!('A'), inputs));
+    println!("Part 2: {:?}", execute(&program, vec!('A'), inputs));
 }
 
 
