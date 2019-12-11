@@ -5,6 +5,7 @@ use std::fmt;
 use std::cmp::{PartialEq, Eq};
 use std::hash::Hash;
 use std::collections::HashMap;
+use std::f64::consts::{PI, FRAC_PI_2};
 
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -39,6 +40,31 @@ impl Point {
         };
         let gcd = n.abs();
         Point { x: self.x / gcd, y: self.y / gcd }
+    }
+
+    fn rotate_90(&self) -> Self {
+        let (x, y) = (self.x as f64, self.y as f64);
+        let theta = FRAC_PI_2;
+        let x2 = x * theta.cos() + y * theta.sin();
+        let y2 = -x * theta.sin() + y * theta.cos();
+
+        Point { x: x2.round() as i64, y: y2.round() as i64 }
+    }
+
+    fn atan(&self) -> f64 {
+        let x = self.x as f64;
+        let y = self.y as f64;
+        y.atan2(x)
+    }
+
+    fn scan_angle(&self) -> f64 {
+        (self.rotate_90().atan() / PI * 4.0 + 4.0) % 8.0
+    }
+
+    fn distance(&self, other: &Point) -> f64 {
+        let (x1, y1) = (self.x as f64, self.y as f64);
+        let (x2, y2) = (other.x as f64, other.y as f64);
+        ((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)).sqrt()
     }
 }
 
@@ -80,9 +106,21 @@ fn count_visible(space: &Space, p1: &Point) -> usize {
     group_by_angle(space, p1).len() - 1
 }
 
+fn sort_by_scan_angle(grouped: HashMap<Point, Vec<Point>>) -> Vec<Vec<Point>> {
+    let mut grouped_as_vec = grouped
+        .iter()
+        .collect::<Vec<_>>();
 
-fn part1(space: &Space) -> () {
-    let (max_point, max_count) = space
+    grouped_as_vec.sort_by(|(d1, _), (d2, _)| d1.scan_angle().partial_cmp(&d2.scan_angle()).expect("Couldn't find an ordering!"));
+
+    grouped_as_vec
+        .iter()
+        .map(|(_, ps)| ps.to_vec())
+        .collect()
+}
+
+fn optimal_station(space: &Space) -> (Point, usize) {
+    space
         .iter()
         .enumerate()
         .map(|(y, row)| row
@@ -95,9 +133,49 @@ fn part1(space: &Space) -> () {
              }))
         .flatten()
         .max_by(|(_, count1), (_, count2)| count1.cmp(&count2))
-        .expect("No maximum point!");
+        .expect("No maximum point!")
+}
+
+fn scan(space: &Space) -> Vec<Point> {
+    let (origin, _) = optimal_station(space);
+    let mut sorted_by_angle = sort_by_scan_angle(group_by_angle(space, &origin));
+    sorted_by_angle
+        .iter_mut()
+        .for_each(|points| points
+                  .sort_by(|point1, point2|
+                           origin.distance(&point1).partial_cmp(
+                               &origin.distance(&point2))
+                           .expect("No ordering on distance found!")
+                  )
+        );
+
+    let mut scan_order = Vec::new();
+    while !sorted_by_angle.iter().all(|points| points.is_empty()) {
+        sorted_by_angle
+            .iter_mut()
+            .for_each(|points| {
+                if !points.is_empty() {
+                    let point = points.remove(0);
+                    if point != origin {
+                        scan_order.push(point);
+                    };
+                };
+            });
+    };
+
+    scan_order
+}
+
+
+fn part1(space: &Space) -> () {
+    let (max_point, max_count) = optimal_station(space);
 
     println!("Part 1: {:?} can see {} asteroids", max_point, max_count);
+}
+
+fn part2(space: &Space) -> () {
+    let lucky = scan(space)[199];
+    println!("{}", lucky.x * 100 + lucky.y);
 }
 
 
@@ -135,6 +213,18 @@ fn main() -> Result<(), std::io::Error> {
 
     print_space(&space);
     part1(&space);
+
+    let unit_vecs: Vec<Point> = vec![
+		Point { x: 0, y: -1 }, Point { x: 1, y: -1 },
+		Point { x: 1, y: 0 }, Point { x: 1, y: 1 },
+        Point { x: 0, y: 1 }, Point { x: -1, y: 1 },
+	    Point { x: -1, y: 0 }, Point { x: -1, y: -1000 }
+	];
+    for (p, dir) in unit_vecs.iter().zip(vec!["U", "UR", "R", "RD", "D", "DL", "L", "LU"]) {
+        println!("{}: {:?}, {:?}", dir, p, p.scan_angle());
+    };
+
+    part2(&space);
 
     Ok(())
 }
