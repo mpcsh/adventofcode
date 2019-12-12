@@ -3,9 +3,11 @@ use std::fs;
 
 use std::fmt;
 use std::cmp::{Ordering, PartialEq, Eq};
+use std::hash::Hash;
+use std::collections::HashSet;
 
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Vector {
     x: i64,
     y: i64,
@@ -38,6 +40,10 @@ impl Vector {
             z: self.z + other.z
         }
     }
+
+    fn energy(&self) -> u64 {
+        (self.x.abs() + self.y.abs() + self.z.abs()) as u64
+    }
 }
 
 impl fmt::Debug for Vector {
@@ -46,7 +52,7 @@ impl fmt::Debug for Vector {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Moon {
     pos: Vector,
     vel: Vector
@@ -68,7 +74,7 @@ impl fmt::Debug for Moon {
 }
 
 
-fn vel_diff(c1: i64, c2: i64) -> (i64, i64) {
+fn component_diff(c1: i64, c2: i64) -> (i64, i64) {
     match c1.cmp(&c2) {
         Ordering::Less => (1, -1),
         Ordering::Equal => (0, 0),
@@ -76,40 +82,87 @@ fn vel_diff(c1: i64, c2: i64) -> (i64, i64) {
     }
 }
 
-fn update_velocities(m1: &mut Moon, m2: &mut Moon) -> () {
-    let (vx1_diff, vx2_diff) = vel_diff(m1.pos.x, m2.pos.x);
-    let (vy1_diff, vy2_diff) = vel_diff(m1.pos.y, m2.pos.y);
-    let (vz1_diff, vz2_diff) = vel_diff(m1.pos.z, m2.pos.z);
+fn vel_diff(v1: &Vector, v2: &Vector) -> (Vector, Vector) {
+    let (x1_diff, x2_diff) = component_diff(v1.x, v2.x);
+    let (y1_diff, y2_diff) = component_diff(v1.y, v2.y);
+    let (z1_diff, z2_diff) = component_diff(v1.z, v2.z);
 
-    m1.vel.x += vx1_diff;
-    m1.vel.y += vy1_diff;
-    m1.vel.z += vz1_diff;
+    let v1_diff = Vector { x: x1_diff, y: y1_diff, z: z1_diff };
+    let v2_diff = Vector { x: x2_diff, y: y2_diff, z: z2_diff };
 
-    m2.vel.x += vx2_diff;
-    m2.vel.y += vy2_diff;
-    m2.vel.z += vz2_diff;
+    (v1_diff, v2_diff)
 }
 
-fn step(moons: &Vec<Moon>) -> Vec<Moon> {
-    let mut new_moons: Vec<Moon> = moons.iter().map(|&m| m).collect();
-
-    // apply gravity: change velocities
-    for (i1, _) in moons.iter().enumerate() {
-        for (i2, _) in moons.iter().skip(i1 + 1).enumerate() {
-            let new_m1: &mut Moon = &mut new_moons[i1];
-            let new_m2: &mut Moon = &mut new_moons[i2 + i1];
-            // let mut new_m1 = new_moons.get_mut(i1).expect("No new_m1!");
-            // let mut new_m2 = new_moons.get_mut(i2 + i1).expect("No new_m2!");
-            update_velocities(new_m1, new_m2);
+fn step(moons: &mut Vec<Moon>) -> () {
+    let mut velocities: Vec<Vector> = moons.iter().map(|m| m.vel).collect();
+    // apply gravity: compute velocities
+    for (i1, m1) in moons.iter().enumerate() {
+        for (i2, m2) in moons.iter().skip(i1 + 1).enumerate() {
+            let (v1_diff, v2_diff) = vel_diff(&m1.pos, &m2.pos);
+            velocities[i1] = velocities[i1].sum(&v1_diff);
+            velocities[i2 + i1 + 1] = velocities[i2 + i1 + 1].sum(&v2_diff);
         };
     };
 
     // apply velocity: change positions
-    for mut new_m in new_moons.iter_mut() {
-        new_m.pos = new_m.pos.sum(&new_m.vel);
+    for (mut m, v_diff) in moons.iter_mut().zip(velocities.iter()) {
+        m.vel = *v_diff;
+        m.pos = m.pos.sum(&v_diff);
+    };
+}
+
+fn compute_energy(moons: &Vec<Moon>) -> u64 {
+    moons
+        .iter()
+        .map(|m| m.pos.energy() * m.vel.energy())
+        .sum()
+}
+
+fn gcd(mut x: usize, mut y: usize) -> usize {
+    while x != 0 {
+        let old_x = x;
+        x = y % x;
+        y = old_x;
     };
 
-    new_moons
+    y
+}
+
+fn lcm(x: usize, y: usize) -> usize {
+    (x * y) / gcd(x, y)
+}
+
+
+fn part1(moons: &Vec<Moon>) -> () {
+    let mut moons = moons.to_vec();
+    (0..1000).for_each(|_| step(&mut moons));
+    println!("Part 1: {:?}", compute_energy(&moons));
+}
+
+fn part2(moons: &Vec<Moon>) -> () {
+    let selectors: Vec<fn(&Moon) -> (i64, i64)> = vec![
+        |m| (m.pos.x, m.vel.x),
+        |m| (m.pos.y, m.vel.y),
+        |m| (m.pos.z, m.vel.z),
+    ];
+
+    let mut cycle_frequencies: Vec<usize> = Vec::new();
+
+    for selector in selectors {
+        let mut past_generations: HashSet<Vec<(i64, i64)>> = HashSet::new();
+        let mut current_gen = moons.to_vec();
+        let mut cycle_frequency = 0;
+        while !past_generations.contains(&current_gen.iter().map(selector).collect::<Vec<(i64, i64)>>()) {
+            past_generations.insert(current_gen.iter().map(selector).collect::<Vec<(i64, i64)>>());
+            step(&mut current_gen);
+            cycle_frequency += 1;
+        };
+        cycle_frequencies.push(cycle_frequency);
+    };
+
+    let cycle_point = cycle_frequencies.iter().fold(1, |acc, &freq| lcm(acc, freq));
+
+    println!("Part 2: {}", cycle_point);
 }
 
 
@@ -122,13 +175,12 @@ fn main() -> Result<(), std::io::Error> {
         if line != "" {
             let pos = Vector::from_str(line);
             let moon = Moon::from_pos(pos);
-            // println!("{:?}", moon);
             moons.push(moon);
         };
     };
 
-    println!("{:#?}", moons);
-    println!("{:#?}", step(&moons));
+    part1(&moons);
+    part2(&moons);
 
     Ok(())
 }
